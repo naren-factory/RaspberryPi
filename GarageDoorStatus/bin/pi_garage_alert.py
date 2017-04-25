@@ -22,7 +22,7 @@ from email.mime.text import MIMEText
 import requests
 import RPi.GPIO as GPIO
 import httplib2
-from twilio.rest import TwilioRestClient
+from twilio.rest import Client
 from twilio.rest.exceptions import TwilioRestException
 
 sys.path.append('/usr/local/etc')
@@ -55,15 +55,46 @@ class Twilio(object):
             if cfg.TWILIO_ACCOUNT == '' or cfg.TWILIO_TOKEN == '':
                 self.logger.error("Twilio account or token not specified - unable to send SMS!")
             else:
-                self.twilio_client = TwilioRestClient(cfg.TWILIO_ACCOUNT, cfg.TWILIO_TOKEN)
+                self.twilio_client = Client(cfg.TWILIO_ACCOUNT, cfg.TWILIO_TOKEN)
 
         if self.twilio_client != None:
             self.logger.info("Sending SMS to %s: %s", recipient, msg)
             try:
-                self.twilio_client.sms.messages.create(
+                self.twilio_client.messages.create(
                     to=recipient,
                     from_=cfg.TWILIO_PHONE_NUMBER,
                     body=truncate(msg, 140))
+            except TwilioRestException as ex:
+                self.logger.error("Unable to send SMS: %s", ex)
+            except httplib2.ServerNotFoundError as ex:
+                self.logger.error("Unable to send SMS - internet connectivity issues: %s", ex)
+            except:
+                self.logger.error("Exception sending SMS: %s", sys.exc_info()[0])
+
+
+    def call_phone(self, recipient):
+        """Make a call to specified phone number using Twilio.
+
+        Args:
+            recipient: Phone number to call.
+        """
+
+        # User may not have configured twilio - don't initialize it until it's
+        # first used
+        if self.twilio_client is None:
+            self.logger.info("Initializing Twilio")
+
+            if cfg.TWILIO_ACCOUNT == '' or cfg.TWILIO_TOKEN == '':
+                self.logger.error("Twilio account or token not specified - unable to make a call!")
+            else:
+                self.twilio_client = Client(cfg.TWILIO_ACCOUNT, cfg.TWILIO_TOKEN)
+
+        if self.twilio_client != None:
+            self.logger.info("Sending SMS to %s: %s", recipient, msg)
+            try:
+                self.twilio_client.calls.create(to=recipient,
+                           from_=cfg.TWILIO_PHONE_NUMBER,
+                           url="http://demo.twilio.com/docs/voice.xml")
             except TwilioRestException as ex:
                 self.logger.error("Unable to send SMS: %s", ex)
             except httplib2.ServerNotFoundError as ex:
@@ -105,97 +136,6 @@ class Email(object):
             mail.quit()
         except:
             self.logger.error("Exception sending email: %s", sys.exc_info()[0])
-
-##############################################################################
-# Pushbullet support
-##############################################################################
-
-class Pushbullet(object):
-    """Class to send Pushbullet notes"""
-
-    def __init__(self):
-        self.logger = logging.getLogger(__name__)
-
-    def send_note(self, access_token, title, body):
-        """Sends a note to the specified access token.
-
-        Args:
-            access_token: Access token of the Pushbullet account to send to.
-            title: Note title
-            body: Body of the note to send
-        """
-        self.logger.info("Sending Pushbullet note to %s: title = \"%s\", body = \"%s\"", access_token, title, body)
-
-        headers = {'Content-type': 'application/json'}
-        payload = {'type': 'note', 'title': title, 'body': body}
-
-        try:
-            session = requests.Session()
-            session.auth = (access_token, "")
-            session.headers.update(headers)
-            session.post("https://api.pushbullet.com/v2/pushes", data=json.dumps(payload))
-        except:
-            self.logger.error("Exception sending note: %s", sys.exc_info()[0])
-
-##############################################################################
-# IFTTT support using Maker Channel (https://ifttt.com/maker)
-##############################################################################
-
-class IFTTT(object):
-    """Class to send IFTTT triggers using the Maker Channel"""
-
-    def __init__(self):
-        self.logger = logging.getLogger(__name__)
-
-    def send_trigger(self, event, value1, value2, value3):
-        """Send an IFTTT event using the maker channel.
-
-        Get the key by following the URL at https://ifttt.com/services/maker/settings
-
-        Args:
-            event: Event name
-            value1, value2, value3: Optional data to supply to IFTTT.
-        """
-        self.logger.info("Sending IFTTT event \"%s\": value1 = \"%s\", value2 = \"%s\", value3 = \"%s\"", event, value1, value2, value3)
-
-        headers = {'Content-type': 'application/json'}
-        payload = {'value1': value1, 'value2': value2, 'value3': value3}
-        try:
-            requests.post("https://maker.ifttt.com/trigger/%s/with/key/%s" % (event, cfg.IFTTT_KEY), headers=headers, data=json.dumps(payload))
-        except:
-            self.logger.error("Exception sending IFTTT event: %s", sys.exc_info()[0])
-
-##############################################################################
-# Google Cloud Messaging support
-##############################################################################
-
-class GoogleCloudMessaging(object):
-    """Class to send GCM notifications"""
-
-    def __init__(self):
-        self.logger = logging.getLogger(__name__)
-
-    def send_push(self, state, body):
-        """Sends a push notification to the specified topic.
-
-        Args:
-            state: Garage door state as string ("0"|"1")
-            body: Body of the note to send
-        """
-        status = "1" if state == 'open' else "0"
-
-        self.logger.info("Sending GCM push to %s: status = \"%s\", body = \"%s\"", cfg.GCM_TOPIC, status, body)
-
-        auth_header = "key=" + cfg.GCM_KEY
-        headers = {'Content-type': 'application/json', 'Authorization': auth_header}
-        payload = {'to': cfg.GCM_TOPIC, 'data': {'message': body, 'status': status}}
-
-        try:
-            session = requests.Session()
-            session.headers.update(headers)
-            session.post("https://gcm-http.googleapis.com/gcm/send", data=json.dumps(payload))
-        except:
-            self.logger.error("Exception sending push: %s", sys.exc_info()[0])
 
 ##############################################################################
 # Sensor support
@@ -268,22 +208,10 @@ def send_alerts(logger, alert_senders, recipients, subject, msg, state, time_in_
     for recipient in recipients:
         if recipient[:6] == 'email:':
             alert_senders['Email'].send_email(recipient[6:], subject, msg)
-        elif recipient[:11] == 'twitter_dm:':
-            alert_senders['Twitter'].direct_msg(recipient[11:], msg)
-        elif recipient == 'tweet':
-            alert_senders['Twitter'].update_status(msg)
         elif recipient[:4] == 'sms:':
             alert_senders['Twilio'].send_sms(recipient[4:], msg)
-        elif recipient[:7] == 'jabber:':
-            alert_senders['Jabber'].send_msg(recipient[7:], msg)
-        elif recipient[:11] == 'pushbullet:':
-            alert_senders['Pushbullet'].send_note(recipient[11:], subject, msg)
-        elif recipient[:6] == 'ifttt:':
-            alert_senders['IFTTT'].send_trigger(recipient[6:], subject, state, '%d' % (time_in_state))
-        elif recipient[:6] == 'spark:':
-            alert_senders['CiscoSpark'].send_sparkmsg(recipient[6:], msg)
-        elif recipient == 'gcm':
-            alert_senders['Gcm'].send_push(state, msg)
+        elif recipient[:7] == 'call:':
+            alert_senders['Twilio'].call_phone(recipient[4:], msg)
         else:
             logger.error("Unrecognized recipient type: %s", recipient)
 
@@ -381,10 +309,7 @@ class PiGarageAlert(object):
             # Create alert sending objects
             alert_senders = {
                 "Twilio": Twilio(),
-                "Email": Email(),
-                "Pushbullet": Pushbullet(),
-                "IFTTT": IFTTT(),
-                "Gcm": GoogleCloudMessaging()
+                "Email": Email()
             }
 
             # Read initial states
