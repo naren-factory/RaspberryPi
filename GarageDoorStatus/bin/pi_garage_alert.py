@@ -3,7 +3,7 @@
 
 Author: Naren
 
-Description: Emails, and sends an SMS if a garage door is left open
+Description: Sends an SMS and make a call, if a garage door is left open
 too long.
 
 """
@@ -28,7 +28,7 @@ sys.path.append('/usr/local/etc')
 import pi_garage_alert_config as cfg
 
 ##############################################################################
-# Twilio support
+# Twilio support - SMS and Call
 ##############################################################################
 
 class Twilio(object):
@@ -85,48 +85,13 @@ class Twilio(object):
                 self.twilio_client = Client(cfg.TWILIO_ACCOUNT, cfg.TWILIO_TOKEN)
 
         if self.twilio_client != None:
-            self.logger.info("Sending SMS to %s: %s", recipient, msg)
+            self.logger.info("Calling.. %s: %s", recipient, msg)
             try:
                 self.twilio_client.calls.create(to=recipient,
                            from_=cfg.TWILIO_PHONE_NUMBER,
                            url="http://demo.twilio.com/docs/voice.xml")
             except:
-                self.logger.error("Exception sending SMS: %s", sys.exc_info()[0])
-
-##############################################################################
-# Email support
-##############################################################################
-
-class Email(object):
-    """Class to send emails"""
-
-    def __init__(self):
-        self.logger = logging.getLogger(__name__)
-
-    def send_email(self, recipient, subject, msg):
-        """Sends an email to the specified email address.
-
-        Args:
-            recipient: Email address to send to.
-            subject: Email subject.
-            msg: Body of email to send.
-        """
-        self.logger.info("Sending email to %s: subject = \"%s\", message = \"%s\"", recipient, subject, msg)
-
-        msg = MIMEText(msg)
-        msg['Subject'] = subject
-        msg['To'] = recipient
-        msg['From'] = cfg.EMAIL_FROM
-        msg['X-Priority'] = cfg.EMAIL_PRIORITY
-
-        try:
-            mail = smtplib.SMTP(cfg.SMTP_SERVER, cfg.SMTP_PORT)
-            if cfg.SMTP_USER != '' and cfg.SMTP_PASS != '':
-                mail.login(cfg.SMTP_USER, cfg.SMTP_PASS)
-            mail.sendmail(cfg.EMAIL_FROM, recipient, msg.as_string())
-            mail.quit()
-        except:
-            self.logger.error("Exception sending email: %s", sys.exc_info()[0])
+                self.logger.error("Exception Calling: %s", sys.exc_info()[0])
 
 ##############################################################################
 # Sensor support
@@ -197,12 +162,10 @@ def send_alerts(logger, alert_senders, recipients, subject, msg, state, time_in_
         state: The state of the door
     """
     for recipient in recipients:
-        if recipient[:6] == 'email:':
-            alert_senders['Email'].send_email(recipient[6:], subject, msg)
-        elif recipient[:4] == 'sms:':
+        if recipient[:4] == 'sms:':
             alert_senders['Twilio'].send_sms(recipient[4:], msg)
-        elif recipient[:7] == 'call:':
-            alert_senders['Twilio'].call_phone(recipient[4:], msg)
+        elif recipient[:5] == 'call:':
+            alert_senders['Twilio'].call_phone(recipient[5:], msg)
         else:
             logger.error("Unrecognized recipient type: %s", recipient)
 
@@ -299,8 +262,7 @@ class PiGarageAlert(object):
 
             # Create alert sending objects
             alert_senders = {
-                "Twilio": Twilio(),
-                "Email": Email()
+                "Twilio": Twilio()
             }
 
             # Read initial states
