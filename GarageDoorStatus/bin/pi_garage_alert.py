@@ -23,7 +23,6 @@ import requests
 import RPi.GPIO as GPIO
 import httplib2
 from twilio.rest import Client
-from twilio.rest.exceptions import TwilioRestException
 
 sys.path.append('/usr/local/etc')
 import pi_garage_alert_config as cfg
@@ -64,10 +63,6 @@ class Twilio(object):
                     to=recipient,
                     from_=cfg.TWILIO_PHONE_NUMBER,
                     body=truncate(msg, 140))
-            except TwilioRestException as ex:
-                self.logger.error("Unable to send SMS: %s", ex)
-            except httplib2.ServerNotFoundError as ex:
-                self.logger.error("Unable to send SMS - internet connectivity issues: %s", ex)
             except:
                 self.logger.error("Exception sending SMS: %s", sys.exc_info()[0])
 
@@ -95,10 +90,6 @@ class Twilio(object):
                 self.twilio_client.calls.create(to=recipient,
                            from_=cfg.TWILIO_PHONE_NUMBER,
                            url="http://demo.twilio.com/docs/voice.xml")
-            except TwilioRestException as ex:
-                self.logger.error("Unable to send SMS: %s", ex)
-            except httplib2.ServerNotFoundError as ex:
-                self.logger.error("Unable to send SMS - internet connectivity issues: %s", ex)
             except:
                 self.logger.error("Exception sending SMS: %s", sys.exc_info()[0])
 

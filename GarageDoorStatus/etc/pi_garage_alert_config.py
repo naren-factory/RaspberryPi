@@ -10,11 +10,11 @@ GARAGE_DOORS = [
         'pin': 15,
         'name': "Main Garage Door",
         'alerts': [
-#            {
-#                'state': 'open',
-#                'time': 300,
-#                'recipients': [ 'sms:+19083136204', 'email:narrensingh@gmail.com' ]
-#            }
+            {
+                'state': 'open',
+                'time': 30,
+                'recipients': [ 'sms:+19083136204', 'email:narrensingh@gmail.com' ]
+            }
         ]
     }
 ]
