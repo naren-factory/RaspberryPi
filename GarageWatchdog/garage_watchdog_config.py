@@ -45,8 +45,5 @@ SMTP_PASSWORD = 'password'
 # Keep alive message settings
 ##############################################################################
 
-# Use from ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
-KEEP_ALIVE_MSG_DAY = 'Su'
-KEEP_ALIVE_MSG_HOURS = 16 # 24-hour format
-KEEP_ALIVE_MSG_MINS = 10
+KEEP_ALIVE_MSG_DURATION = 604800 # one week in seconds
 KEEP_ALIVE_MSG_SENT_TO = 'sendto@domain.com' # send the keep alive msg to this email address 

@@ -227,15 +227,8 @@ def format_duration(duration_sec):
 class KeepAliveMsg(object):
     
     def send_keep_alive_msg(self):
-        reminder_text = "Garage Door System working fine."
-        hr = int(float(datetime.datetime.now().strftime("%H")))   ## hours (24h)
-        dwn = int(float(datetime.date.today().strftime("%w")))    ## day of the week numerically(0=Sunday, 6=Saturday)
-        dwa = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']    ## day of the week alphanumerically(0=Sunday, 6=Saturday)
-        day = dwa[dwn]
-        reminder_day = cfg.KEEP_ALIVE_MSG_DAY
-        reminder_time = cfg.KEEP_ALIVE_MSG_HOURS
-        if day == reminder_day and hr == reminder_time:
-            Smtp().send_mail(reminder_text)
+        reminder_text = "Garage Door System working fine :)"
+        Smtp().send_mail(reminder_text)
         
     
 ##############################################################################
@@ -336,6 +329,8 @@ class GarageWatchdog(object):
                 self.logger.info("Initial state of \"%s\" is %s", name, state)
 
             status_report_countdown = 5
+            # one week in seconds
+            keep_alive_time = cfg.KEEP_ALIVE_MSG_DURATION 
             while True:
                 for door in cfg.GARAGE_DOORS:
                     name = door['name']
@@ -379,7 +374,11 @@ class GarageWatchdog(object):
                     self.logger.info(status_msg)
 
                     status_report_countdown = 600
-                KeepAliveMsg().send_keep_alive_msg()
+                if(keep_alive_time <= 0):
+                    KeepAliveMsg().send_keep_alive_msg()
+                    keep_alive_time = cfg.KEEP_ALIVE_MSG_DURATION
+                else:
+                    keep_alive_time--
 
                 # Poll every 1 second
                 time.sleep(1)
