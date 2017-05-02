@@ -227,12 +227,6 @@ def format_duration(duration_sec):
 class KeepAliveMsg(object):
     
     def send_keep_alive_msg(self):
-        # define sender email account
-        smtp_email_addr = cfg.SENDER_EMAIL_ADDRESS
-        smtp_server = cfg.SMTP_SERVER
-        smtp_port = cfg.SMTP_PORT   #depending on provider and security level
-        smtp_user = cfg.SMTP_USERNAME
-        smtp_pass = cfg.SMTP_PASSWORD
         reminder_text = "Garage Door System working fine."
         hr = int(float(datetime.datetime.now().strftime("%H")))   ## hours (24h)
         dwn = int(float(datetime.date.today().strftime("%w")))    ## day of the week numerically(0=Sunday, 6=Saturday)
@@ -241,32 +235,43 @@ class KeepAliveMsg(object):
         reminder_day = cfg.KEEP_ALIVE_MSG_DAY
         reminder_time = cfg.KEEP_ALIVE_MSG_HOURS
         if day == reminder_day and hr == reminder_time:
-            SUBJECT = reminder_text
-            FROM = smtp_email_addr
-            TEXT = reminder_text
-            # send reminder email
-            TO = cfg.KEEP_ALIVE_MSG_SENT_TO
-            BODY = string.join((
-                    "FROM: %s" % FROM,
-                    "To: %s" % TO,
-                    "Subject: %s" % SUBJECT,
-                    "",
-                    TEXT
-                    ), "\r\n")
-            try:
-                smtpObj = SMTP(smtp_server, smtp_port)
-                smtpObj.set_debuglevel(0)
-                smtpObj.login(smtp_user,smtp_pass)
-                smtpObj.sendmail(FROM, TO, BODY)
-                print ('Successfully sent three months reminder email to', TO)
-                smtpObj.quit()
-            except SMTPException, e:
-                print "Error: unable to send email to ", TO
-                print e
+            Smtp().send_mail(reminder_text)
         
     
-    
+##############################################################################
+# SMTP - For sending mails
+##############################################################################    
 
+class Smtp(object):
+    """docstring for Smtp"""
+    def __init__(self, arg):
+        super(Smtp, self).__init__()
+        self.arg = arg
+
+    def send_mail(subject):
+        # define sender email account
+        smtp_email_addr = cfg.SENDER_EMAIL_ADDRESS
+        smtp_server = cfg.SMTP_SERVER
+        smtp_port = cfg.SMTP_PORT   #depending on provider and security level
+        smtp_user = cfg.SMTP_USERNAME
+        smtp_pass = cfg.SMTP_PASSWORD
+        SUBJECT = subject
+        FROM = smtp_email_addr
+        TEXT = subject
+        # send reminder email
+        TO = cfg.KEEP_ALIVE_MSG_SENT_TO
+        BODY = string.join(("FROM: %s" % FROM, "To: %s" % TO, "Subject: %s" % SUBJECT, "", TEXT), "\r\n")
+        try:
+            smtpObj = SMTP(smtp_server, smtp_port)
+            smtpObj.set_debuglevel(0)
+            smtpObj.login(smtp_user,smtp_pass)
+            smtpObj.sendmail(FROM, TO, BODY)
+            print ('Successfully sent keep alive email to', TO)
+            smtpObj.quit()
+        except SMTPException, e:
+            print "Error: unable to send email to ", TO
+            print e
+        
 ##############################################################################
 # Main functionality
 ##############################################################################
