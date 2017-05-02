@@ -92,7 +92,7 @@ class Twilio(object):
                 self.twilio_client = Client(cfg.TWILIO_ACCOUNT, cfg.TWILIO_TOKEN)
 
         if self.twilio_client != None:
-            self.logger.info("Calling.. %s: %s", recipient, msg)
+            self.logger.info("Calling.. %s:", recipient)
             try:
                 self.twilio_client.calls.create(to=recipient,
                            from_=cfg.TWILIO_PHONE_NUMBER,
@@ -172,7 +172,7 @@ def send_alerts(logger, alert_senders, recipients, subject, msg, state, time_in_
         if recipient[:4] == 'sms:':
             alert_senders['Twilio'].send_sms(recipient[4:], msg)
         elif recipient[:5] == 'call:':
-            alert_senders['Twilio'].call_phone(recipient[5:], msg)
+            alert_senders['Twilio'].call_phone(recipient[5:])
         else:
             logger.error("Unrecognized recipient type: %s", recipient)
 
@@ -236,13 +236,11 @@ class KeepAliveMsg(object):
         reminder_text = "Garage Door System working fine."
         hr = int(float(datetime.datetime.now().strftime("%H")))   ## hours (24h)
         dwn = int(float(datetime.date.today().strftime("%w")))    ## day of the week numerically(0=Sunday, 6=Saturday)
-        print dwn
         dwa = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']    ## day of the week alphanumerically(0=Sunday, 6=Saturday)
         day = dwa[dwn]
         reminder_day = cfg.KEEP_ALIVE_MSG_DAY
         reminder_time = cfg.KEEP_ALIVE_MSG_HOURS
         if day == reminder_day and hr == reminder_time:
-            print 'Found'
             SUBJECT = reminder_text
             FROM = smtp_email_addr
             TEXT = reminder_text
@@ -296,7 +294,7 @@ class GarageWatchdog(object):
 
             # Banner
             self.logger.info("==========================================================")
-            self.logger.info("Pi Garage Alert starting")
+            self.logger.info("Garage watch dog system starts")
 
             # Use Raspberry Pi board pin numbers
             self.logger.info("Configuring global settings")
@@ -376,7 +374,7 @@ class GarageWatchdog(object):
                     self.logger.info(status_msg)
 
                     status_report_countdown = 600
-                send_keep_alive_msg()
+                KeepAliveMsg().send_keep_alive_msg()
 
                 # Poll every 1 second
                 time.sleep(1)
