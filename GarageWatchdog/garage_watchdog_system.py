@@ -72,6 +72,8 @@ class Twilio(object):
                     body=truncate(msg, 140))
             except:
                 self.logger.error("Exception sending SMS: %s", sys.exc_info()[0])
+                reminder_text = "Exception sending SMS!!! Garage Door Open"
+                Smtp().send_mail(reminder_text)
 
 
     def call_phone(self, recipient):
@@ -99,6 +101,8 @@ class Twilio(object):
                            url="http://demo.twilio.com/docs/voice.xml")
             except:
                 self.logger.error("Exception Calling: %s", sys.exc_info()[0])
+                reminder_text = "Exception Calling!! Garage Door Open"
+                Smtp().send_mail(reminder_text)
 
 ##############################################################################
 # Sensor support
