@@ -236,12 +236,8 @@ class KeepAliveMsg(object):
 ##############################################################################    
 
 class Smtp(object):
-    """docstring for Smtp"""
-    def __init__(self, arg):
-        super(Smtp, self).__init__()
-        self.arg = arg
-
-    def send_mail(subject):
+    
+    def send_mail(self, subject):
         # define sender email account
         smtp_email_addr = cfg.SENDER_EMAIL_ADDRESS
         smtp_server = cfg.SMTP_SERVER
@@ -378,7 +374,7 @@ class GarageWatchdog(object):
                     KeepAliveMsg().send_keep_alive_msg()
                     keep_alive_time = cfg.KEEP_ALIVE_MSG_DURATION
                 else:
-                    keep_alive_time--
+                    keep_alive_time -= 1
 
                 # Poll every 1 second
                 time.sleep(1)
