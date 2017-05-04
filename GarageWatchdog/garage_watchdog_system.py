@@ -2,107 +2,20 @@
 """ Garage Watch dog system
 
 Author: Naren
-
-Description:
-i) Sends an SMS and make a call, if a garage door is left open too long.
-ii) Open/Close door remotly from anywhere.
-iii) Sends mail every Sunday at 4 PM, telling that the system is alive
-
-
 """
 
-import time
-import subprocess
-import re
-import sys
-import json
 import logging
-from datetime import timedelta
-import smtplib
+import re
+import subprocess
+import sys
+import time
 import traceback
-from email.mime.text import MIMEText
-from smtplib import SMTP_SSL as SMTP  ## Import secure smtp-library to provide email functions
-from smtplib import SMTPException
-import string    ## required to join together 'from', 'to', 'subject', etc. to a string
-import datetime   ## Import 'datetime' library. Allows getting date and time
+from datetime import timedelta
 
-import requests
 import RPi.GPIO as GPIO
-import httplib2
-from twilio.rest import Client
 
 sys.path.append('/usr/local/etc')
-import garage_watchdog_config as cfg
-
-##############################################################################
-# Twilio support - SMS and Call
-##############################################################################
-
-class Twilio(object):
-    """Class to connect to and send SMS and call using Twilio"""
-
-    def __init__(self):
-        self.twilio_client = None
-        self.logger = logging.getLogger(__name__)
-
-    def send_sms(self, recipient, msg):
-        """Sends SMS message to specified phone number using Twilio.
-
-        Args:
-            recipient: Phone number to send SMS to.
-            msg: Message to send. Long messages will automatically be truncated.
-        """
-
-        # User may not have configured twilio - don't initialize it until it's
-        # first used
-        if self.twilio_client is None:
-            self.logger.info("Initializing Twilio")
-
-            if cfg.TWILIO_ACCOUNT == '' or cfg.TWILIO_TOKEN == '':
-                self.logger.error("Twilio account or token not specified - unable to send SMS!")
-            else:
-                self.twilio_client = Client(cfg.TWILIO_ACCOUNT, cfg.TWILIO_TOKEN)
-
-        if self.twilio_client != None:
-            self.logger.info("Sending SMS to %s: %s", recipient, msg)
-            try:
-                self.twilio_client.messages.create(
-                    to=recipient,
-                    from_=cfg.TWILIO_PHONE_NUMBER,
-                    body=truncate(msg, 140))
-            except:
-                self.logger.error("Exception sending SMS: %s", sys.exc_info()[0])
-                reminder_text = "Exception sending SMS!!! Garage Door Open"
-                Smtp().send_mail(reminder_text)
-
-
-    def call_phone(self, recipient):
-        """Make a call to specified phone number using Twilio.
-
-        Args:
-            recipient: Phone number to call.
-        """
-
-        # User may not have configured twilio - don't initialize it until it's
-        # first used
-        if self.twilio_client is None:
-            self.logger.info("Initializing Twilio")
-
-            if cfg.TWILIO_ACCOUNT == '' or cfg.TWILIO_TOKEN == '':
-                self.logger.error("Twilio account or token not specified - unable to make a call!")
-            else:
-                self.twilio_client = Client(cfg.TWILIO_ACCOUNT, cfg.TWILIO_TOKEN)
-
-        if self.twilio_client != None:
-            self.logger.info("Calling.. %s:", recipient)
-            try:
-                self.twilio_client.calls.create(to=recipient,
-                           from_=cfg.TWILIO_PHONE_NUMBER,
-                           url="http://demo.twilio.com/docs/voice.xml")
-            except:
-                self.logger.error("Exception Calling: %s", sys.exc_info()[0])
-                reminder_text = "Exception Calling!! Garage Door Open"
-                Smtp().send_mail(reminder_text)
+import garage_watchdog_config as config
 
 ##############################################################################
 # Sensor support
@@ -236,36 +149,6 @@ class KeepAliveMsg(object):
         
     
 ##############################################################################
-# SMTP - For sending mails
-##############################################################################    
-
-class Smtp(object):
-    
-    def send_mail(self, subject):
-        # define sender email account
-        smtp_email_addr = cfg.SENDER_EMAIL_ADDRESS
-        smtp_server = cfg.SMTP_SERVER
-        smtp_port = cfg.SMTP_PORT   #depending on provider and security level
-        smtp_user = cfg.SMTP_USERNAME
-        smtp_pass = cfg.SMTP_PASSWORD
-        SUBJECT = subject
-        FROM = smtp_email_addr
-        TEXT = subject
-        # send reminder email
-        TO = cfg.KEEP_ALIVE_MSG_SENT_TO
-        BODY = string.join(("FROM: %s" % FROM, "To: %s" % TO, "Subject: %s" % SUBJECT, "", TEXT), "\r\n")
-        try:
-            smtpObj = SMTP(smtp_server, smtp_port)
-            smtpObj.set_debuglevel(0)
-            smtpObj.login(smtp_user,smtp_pass)
-            smtpObj.sendmail(FROM, TO, BODY)
-            print ('Successfully sent keep alive email to', TO)
-            smtpObj.quit()
-        except SMTPException, e:
-            print "Error: unable to send email to ", TO
-            print e
-        
-##############################################################################
 # Main functionality
 ##############################################################################
 class GarageWatchdog(object):
@@ -288,7 +171,7 @@ class GarageWatchdog(object):
                 logging.basicConfig(format=log_fmt, level=log_level)
             else:
                 # Background mode - log to file
-                logging.basicConfig(format=log_fmt, level=log_level, filename=cfg.LOG_FILENAME)
+                logging.basicConfig(format=log_fmt, level=log_level, filename=config.LOG_FILENAME)
 
             # Banner
             self.logger.info("==========================================================")
@@ -299,7 +182,7 @@ class GarageWatchdog(object):
             GPIO.setmode(GPIO.BOARD)
 
             # Configure the sensor pins as inputs with pull up resistors
-            for door in cfg.GARAGE_DOORS:
+            for door in config.GARAGE_DOORS:
                 self.logger.info("Configuring pin %d for \"%s\"", door['pin'], door['name'])
                 GPIO.setup(door['pin'], GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
@@ -318,7 +201,7 @@ class GarageWatchdog(object):
             }
 
             # Read initial states
-            for door in cfg.GARAGE_DOORS:
+            for door in config.GARAGE_DOORS:
                 name = door['name']
                 state = get_garage_door_state(door['pin'])
 
@@ -330,9 +213,9 @@ class GarageWatchdog(object):
 
             status_report_countdown = 5
             # one week in seconds
-            keep_alive_time = cfg.KEEP_ALIVE_MSG_DURATION 
+            keep_alive_time = config.KEEP_ALIVE_MSG_DURATION
             while True:
-                for door in cfg.GARAGE_DOORS:
+                for door in config.GARAGE_DOORS:
                     name = door['name']
                     state = get_garage_door_state(door['pin'])
                     time_in_state = time.time() - time_of_last_state_change[name]
@@ -376,7 +259,7 @@ class GarageWatchdog(object):
                     status_report_countdown = 600
                 if(keep_alive_time <= 0):
                     KeepAliveMsg().send_keep_alive_msg()
-                    keep_alive_time = cfg.KEEP_ALIVE_MSG_DURATION
+                    keep_alive_time = config.KEEP_ALIVE_MSG_DURATION
                 else:
                     keep_alive_time -= 1
 
