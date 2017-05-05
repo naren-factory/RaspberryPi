@@ -1,10 +1,11 @@
 #!/usr/bin/python2.7
 
-from smtplib import SMTP_SSL as SMTP  ## Import secure smtp-library to provide email functions
+import string  ## required to join together 'from', 'to', 'subject', etc. to a string
 from smtplib import SMTPException
-import string    ## required to join together 'from', 'to', 'subject', etc. to a string
+from smtplib import SMTP_SSL as SMTP  ## Import secure smtp-library to provide email functions
 
 import garage_watchdog_config as config
+
 
 def send_mail(self, subject):
     # define sender email account

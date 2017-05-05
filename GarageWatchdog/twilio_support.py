@@ -37,7 +37,7 @@ def send_sms(self, recipient, msg):
                 body=truncate(msg, 140))
         except:
             self.logger.error("Exception sending SMS: %s", sys.exc_info()[0])
-            reminder_text = "Exception sending SMS!!! Garage Door Open"
+            reminder_text = "Exception sending SMS!!! " + msg
             send_mail(reminder_text)
 
 

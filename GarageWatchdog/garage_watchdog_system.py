@@ -14,6 +14,10 @@ from datetime import timedelta
 
 import RPi.GPIO as GPIO
 
+from smtp_support import send_mail
+from twilio_support import call_phone
+from twilio_support import send_sms
+
 sys.path.append('/usr/local/etc')
 import garage_watchdog_config as config
 
@@ -76,7 +80,7 @@ def rpi_status():
 # Logging and alerts
 ##############################################################################
 
-def send_alerts(logger, alert_senders, recipients, subject, msg, state, time_in_state):
+def send_alerts(logger, recipients, subject, msg, state, time_in_state):
     """Send subject and msg to specified recipients
 
     Args:
@@ -87,9 +91,9 @@ def send_alerts(logger, alert_senders, recipients, subject, msg, state, time_in_
     """
     for recipient in recipients:
         if recipient[:4] == 'sms:':
-            alert_senders['Twilio'].send_sms(recipient[4:], msg)
+            send_sms(recipient[4:], msg)
         elif recipient[:5] == 'call:':
-            alert_senders['Twilio'].call_phone(recipient[5:])
+            call_phone(recipient[5:])
         else:
             logger.error("Unrecognized recipient type: %s", recipient)
 
@@ -137,16 +141,10 @@ def format_duration(duration_sec):
     return ret
 
 
-##############################################################################
-# Keep alive msg sending
-##############################################################################
+def send_keep_alive_msg():
+    reminder_text = "Garage Door System working fine :)"
+    send_mail(reminder_text)
 
-class KeepAliveMsg(object):
-    
-    def send_keep_alive_msg(self):
-        reminder_text = "Garage Door System working fine :)"
-        Smtp().send_mail(reminder_text)
-        
     
 ##############################################################################
 # Main functionality
@@ -195,11 +193,6 @@ class GarageWatchdog(object):
             # Index of the next alert to send for each garage door
             alert_states = dict()
 
-            # Create alert sending objects
-            alert_senders = {
-                "Twilio": Twilio()
-            }
-
             # Read initial states
             for door in config.GARAGE_DOORS:
                 name = door['name']
@@ -230,7 +223,7 @@ class GarageWatchdog(object):
                         if alert_states[name] > 0:
                             # Use the recipients of the last alert
                             recipients = door['alerts'][alert_states[name] - 1]['recipients']
-                            send_alerts(self.logger, alert_senders, recipients, name, "%s is now %s" % (name, state), state, 0)
+                            send_alerts(self.logger, recipients, name, "%s is now %s" % (name, state), state, 0)
                             alert_states[name] = 0
 
                         # Reset time_in_state
@@ -243,7 +236,7 @@ class GarageWatchdog(object):
 
                         # Has the time elapsed and is this the state to trigger the alert?
                         if time_in_state > alert['time'] and state == alert['state']:
-                            send_alerts(self.logger, alert_senders, alert['recipients'], name, "%s has been %s for %d seconds!" % (name, state, time_in_state), state, time_in_state)
+                            send_alerts(self.logger, alert['recipients'], name, "%s has been %s for %d seconds!" % (name, state, time_in_state), state, time_in_state)
                             alert_states[name] += 1
 
                 # Periodically log the status for debug and ensuring RPi doesn't get too hot
@@ -258,7 +251,7 @@ class GarageWatchdog(object):
 
                     status_report_countdown = 600
                 if(keep_alive_time <= 0):
-                    KeepAliveMsg().send_keep_alive_msg()
+                    send_keep_alive_msg()
                     keep_alive_time = config.KEEP_ALIVE_MSG_DURATION
                 else:
                     keep_alive_time -= 1
