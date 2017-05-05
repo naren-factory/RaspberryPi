@@ -141,8 +141,10 @@ def format_duration(duration_sec):
     return ret
 
 
-def send_keep_alive_msg():
+def send_weekly_report():
     reminder_text = "Garage Door System working fine :)"
+    today = time.strftime("%b-%d-%Y")
+    subject = "Garage weekly report " + today
     send_mail(reminder_text)
 
     
@@ -251,7 +253,7 @@ class GarageWatchdog(object):
 
                     status_report_countdown = 600
                 if(keep_alive_time <= 0):
-                    send_keep_alive_msg()
+                    send_weekly_report()
                     keep_alive_time = config.KEEP_ALIVE_MSG_DURATION
                 else:
                     keep_alive_time -= 1
